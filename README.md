@@ -13,7 +13,7 @@ Repositório com scripts para extração e análise de dados de ações e fundos
 ## Estrutura do Repositório
 
 ```plaintext
-analise_mercado_financeiro/
+my_best_wallet/
 ├── .venv/
 ├── dados/
 │   ├── 01_extraidos/
@@ -45,8 +45,8 @@ analise_mercado_financeiro/
 
 1. Clone o repositório:
     ```bash
-    git clone https://github.com/kleiton/analise_mercado_financeiro.git
-    cd analise_mercado_financeiro
+    git clone https://github.com/maranguapo/my_best_wallet.git
+    cd my_best_wallet
     ```
 
 2. Instale as dependências:
