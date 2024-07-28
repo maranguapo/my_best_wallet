@@ -1,6 +1,6 @@
 import pandas as pd
 import logging
-from util import Utils
+from ..util import Utils
 from datetime import datetime
 
 
