@@ -1,10 +1,15 @@
-from ..util import Utils
+from collections import defaultdict
+import re
+
+import bs4
+from util import Utils
 import pandas as pd
 import numpy as np
 import logging
 from datetime import datetime, timedelta, timezone
 import requests
 from bs4 import BeautifulSoup
+from unidecode import unidecode
 
 # URL para extração de todos os tickers de ações e FIIs
 URL_TICKERS_ACOES = "https://www.fundamentus.com.br/resultado.php"
@@ -346,6 +351,198 @@ class Scraping:
         # Mensagem de confirmação
         self.logger.info(f"DataFrame salvo com sucesso como '{nome_arquivo}'.")
 
+
+
+    def getTicketInfos(self, tickets):
+        self.logger.info(tickets)
+
+        # Lista para acumular os DataFrames resultantes de cada ticker
+        dfs = []
+
+        for i, ticket in enumerate(tickets, start=1):
+            print(f"Processando papel {i}/{len(tickets)}: {ticket.strip().upper()}")
+
+            url = self.url_kpis_ticker + ticket.strip().upper()
+            html_content = requests.get(url=url, headers=self.request_header).text
+            soup = BeautifulSoup(html_content, "lxml")
+            tables = soup.find_all("table", class_='w728')
+            simple_tables = [table for table in tables if not has_colspan(table)]
+            
+            ticket_tratado = {}
+            for simple_table in simple_tables:
+                table = get_simple_table_data(simple_table)
+                ticket_tratado.update(table)
+                
+            complex_tables = [table for table in tables if has_colspan(table)]
+
+            mapping_complex_tables = []
+            for c, complex_table in enumerate(complex_tables):
+                rows = complex_table.find_all("tr")
+                table_number = c+1
+                for i, row in enumerate(rows):
+                    acc_colspan = 0
+                    line_number = i
+                    cells = row.find_all("td")
+                    for a, cell in enumerate(cells):
+                        column_number = a
+                        text = cell.text
+                        column_start = acc_colspan
+                        colspan = None
+                        if 'colspan' in cell.attrs and cell['colspan'].isdigit():
+                            colspan = int(cell['colspan'])
+                        if not colspan:
+                            acc_colspan += 1
+                        else:
+                            acc_colspan += colspan
+                        column_end = acc_colspan -1
+                        nivel = None
+                        if 'colspan' in cell.attrs:
+                            for class_name in cell['class']:
+                                if class_name.startswith('nivel'):
+                                    nivel = class_name
+                        cell_object = {"table_number": table_number, "line_number": line_number, "column_start": column_start, "column_end": column_end, "text": text, "colspan": colspan, "nivel": nivel}
+                        mapping_complex_tables.append(cell_object)
+            print(mapping_complex_tables)
+
+
+
+
+
+
+
+
+
+
+                # titles, *data = table_row
+
+                # acc_colspan = 0
+                # for title in titles.find_all("td"):
+                #     name = unidecode(title.text.replace("?", "").strip().replace(" ", "_").replace(".", "").replace("/", "_por_").lower())
+                #     colspan = acc_colspan + int(title['colspan'])
+                #     print("*********** ", acc_colspan, colspan)
+
+                #     simple_table = []
+                #     for data_row in data:
+                #         cells = data_row.find_all("td")
+                #         for i, cell in enumerate(cells):
+                #             if i >= acc_colspan and i < colspan:
+                #                 print(f"Index: {i}, Value: {cell}")
+                #             else:
+                #                 next
+                    
+                #     acc_colspan = acc_colspan + colspan
+                    #     for i in range(colspan):
+                    #         simple_table.append(cells_list[i+acc_colspan])
+                    #     table = get_simple_table_data(simple_table)
+                    # acc_colspan += colspan
+                    # print(table)
+
+
+
+            
+            
+                
+            
+
+            #simple_table_data_dict["tipo"] = tipo
+
+            return mapping_complex_tables
+
+
+
+
+
+
+
+
+
+#<td class="nivel1" colspan="2"><span class="txt">Oscilações</span></td>
+
+
+
+
+
+
+            # tables = soup.find_all("table", attrs={'class': 'w728'})
+
+            
+
+            #financial_data_raw = []
+            # for table in tables:
+            #     table_row = table.find_all("tr")
+            #     for table_data in table_row:
+            #         cells_list = table_data.find_all("td")
+            #         headings = [
+            #             unidecode(cell.text.replace("?", "").strip().replace(" ", "_").replace(".", "").replace("/", "_por_").lower())
+            #             for cell in cells_list
+            #             if "?" in cell.text or cell.text in self.variation_headings
+            #         ]
+                    
+            #         for header in headings:
+            #             if headings.count(header) > 1:
+            #                 new_header_name = header + "_1"
+            #                 headings[headings.index(header)] = new_header_name
+            #         values = [
+            #             cell.text.strip() for cell in cells_list
+            #             if ("?" not in cell.text) and (cell.text not in headings)
+            #         ]
+            #         table_data_dict = {
+            #             header: value for header, value in zip(headings, values)
+            #         }
+            #         if table_data_dict != {}:
+            #             financial_data_raw.append(table_data_dict)
+
+        #return financial_data_raw
+
+def has_colspan(tag):
+    """Verifica se uma tag (ou qualquer de suas filhas) possui o atributo 'colspan'."""
+
+    if tag.name == 'td' and 'colspan' in tag.attrs:
+        return True
+    
+    # Filtra apenas elementos para verificação recursiva
+    for child in filter(lambda x: isinstance(x, bs4.element.Tag), tag.children):
+        if has_colspan(child):
+            return True
+    return False
+
+def get_simple_table_data(simple_table):
+    headers = []
+    values = []
+    tipo = None
+
+    table_row = simple_table.find_all("tr")
+    for table_data in table_row:
+        cells_list = table_data.find_all("td")
+        headings = [
+            unidecode(cell.text.replace("?", "").strip().replace(" ", "_").replace(".", "").replace("/", "_por_").lower())
+            for cell in cells_list
+            if "?" in cell.text
+        ]
+        
+        for header in headings:
+            if headings.count(header) > 1:
+                new_header_name = header + "_1"
+                headings[headings.index(header)] = new_header_name
+            if header == "fii" or header == "papel":
+                headings[headings.index(header)] = "ticket"
+                tipo = "acao" if header == "papel" else "fii"
+            
+        headers.extend(headings)
+
+        data = [
+            cell.text.strip() for cell in cells_list
+            if ("?" not in cell.text) and (cell.text not in headings)
+        ]
+
+        values.extend(data)
+    table_data_dict = {
+        header: value for header, value in zip(headers, values)
+    }
+    if tipo:
+        table_data_dict["tipo"] = tipo
+
+    return dict(table_data_dict)
 
 if __name__ == "__main__":
     Scraping().scraping()
