@@ -36,13 +36,16 @@ def get_tickets(request: GetTicketsRequest):
     try:
         scraping = Scraping()
 
+        retorno = {}
         if fiis:
-            dados_fiis = scraping.getTicketInfos(fiis)
+            dados_fiis = scraping.getTicketInfos(fiis, "fiis")
+            retorno.update(dados_fiis)
         
         if acoes:
-            dados_acoes = scraping.getTicketInfos(acoes)
+            dados_acoes = scraping.getTicketInfos(acoes, "acoes")
+            retorno.update(dados_acoes)
 
-        return dados_fiis
+        return retorno
     except Exception as e:
         logging.error(f"Erro: {e}")
         raise HTTPException(status_code=500, detail=f"Erro: {e}")
